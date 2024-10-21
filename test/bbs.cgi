@@ -96,20 +96,22 @@ sub BBSCGI
 		}
 		else {
 			$Threads->Close();
-			PrintBBSError($CGI, $Page, $err);
-			$log = $err;
+			# Captcha認証画面表示
+			if ($err == $ZP::E_PAGE_CAPTCHA) {
+				PrintBBSCaptcha($CGI, $Page);
+				$log = $err;
+				$err = $ZP::E_SUCCESS;
+			}else{
+				#SaveErrorInfo($Sys, $Set, $err);
+				PrintBBSError($CGI, $Page, $err);
+				$log = $err;
+			}
 		}
 	}
 	else {
 		# cookie確認画面表示
 		if ($err == $ZP::E_PAGE_COOKIE) {
 			PrintBBSCookieConfirm($CGI, $Page);
-			$log = $err;
-			$err = $ZP::E_SUCCESS;
-		}
-		# Captcha認証画面表示
-		elsif ($err == $ZP::E_PAGE_CAPTCHA) {
-			PrintBBSCaptcha($CGI, $Page);
 			$log = $err;
 			$err = $ZP::E_SUCCESS;
 		}
@@ -650,6 +652,36 @@ sub CGIExecutionTime
 
 }
 
+# エラー情報を忍法帖に保存
+sub SaveErrorInfo{
+	my ($Sys, $Set, $err) = @_;
+	return unless $Set->Get('BBS_NINJA');
+
+	require './module/ninja.pl';
+	my $Ninja = NINPOCHO->new;
+	$Ninja->LoadOnly($Sys,$Sys->Get('SID'));
+
+	# 短時間に特定のエラーが集中した場合
+	my $last_etime = $Ninja->Get('last_err_time') || time;
+	my $err_count = $Ninja->Get('error_count') || 0;
+	my $limit_count = $Set->Get('NINJA_ERR_COUNT');
+	my $limit_time = $Set->Get('NINJA_ERR_TIME') * 60;
+	my $ban_period = $Set->Get('NINJA_BAN_PERIOD') * 60;
+
+	if($err = $ZP::E_FORM_NOCAPTCHA||$ZP::E_FORM_FAILEDCAPTCHA||$ZP::E_FORM_FAILEDAUTH
+	||$ZP::E_REG_NGWORD||$ZP::E_REG_NGUSER||$ZP::E_REG_SPAMKILL||$ZP::E_REG_BAN||$ZP::E_REG_NINLVLIMIT){
+		if (int(time / $limit_time) == int($last_etime / $limit_time)) {
+			$err_count++;
+		} else {
+			$err_count = 1;
+		}
+	}
+	if($err_count >= $limit_count){
+		$Ninja->Set('time_ban',$ban_period);
+	}
+
+}
+
 # SessionIDの取得
 sub LoadSessionID
 {
@@ -673,7 +705,7 @@ sub LoadSessionID
 	$ctx->add(':', $Sys->Get('SERVER'));
 	$ctx->add(':', $ENV{'REMOTE_ADDR'});
 	my $infoDir = $Sys->Get('INFO');
-	my $ipHash = $ctx->b64digest;
+	my $ipHash = $ctx->hexdigest;
 	my $ipFile = ".$infoDir/.ninpocho/hash/ip-$ipHash.cgi";
 
 	my $fileExpiry = 60 * 60 * 24;

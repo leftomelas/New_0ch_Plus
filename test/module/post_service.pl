@@ -1182,7 +1182,7 @@ sub IsRegulation
 			$Sys->Set('IPCOUNTRY','abroad');
 		}
 		# PROXYチェック
-		if ($this->{'CONV'}->IsProxyDNSBL($this->{'SYS'}, $this->{'FORM'}, $from, $mode)) {			# DNSBLによるチェック
+		if ($this->{'CONV'}->IsListedDNSBL($this->{'SYS'}, $this->{'FORM'}, $from, $mode)) {			# DNSBLによるチェック
 			#$this->{'FORM'}->Set('FROM', "</b> [—\{}\@{}\@{}-] <b>$from");
 			if (!$Sec->IsAuthority($capID, $ZP::CAP_REG_DNSBL, $bbs) && $Set->Equal('BBS_DNSBL_CHECK', 'checked')) {
 				return $ZP::E_REG_DNSBL;
@@ -2339,10 +2339,6 @@ sub CaptchaAuthentication
 
 					# mailフォームクリア
 					$Form->Set('mail','success');
-					
-					# 期限切れファイルのクリア
-					# ClearExpiredFiles($Dir,qr/^code-[\x20-\x7E]+\.cgi$/,$fileExpiry);
-
 					$err = $ZP::E_SUCCESS;
 				}else{
 					# IP不一致
@@ -2446,7 +2442,7 @@ sub Certification_Captcha {
 		# 認証ページへ
 		return $ZP::E_PAGE_CAPTCHA;
 	}else{
-		# Captchaページから来て、Captcha認証してない場合(専ブラ等)
+		# Captcha認証してない場合(専ブラ等)
 		return $ZP::E_FORM_NOCAPTCHA;
 	}
 	
